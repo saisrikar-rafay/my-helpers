@@ -17,3 +17,184 @@ alias rafay-hub-logs='kubectl logs -f -l app=rafay-hub -n rafay-core -c rafay-hu
 alias infra-api-logs='kubectl logs -f -l app=infra-apiserver -n rafay-core -c infra-apiserver --prefix --tail=10'
 alias infra-relay-logs='kubectl logs -f -l app=infra-relay -n rafay-core -c infra-relay --prefix --tail=10'
 alias capi-gke-logs='kubectl logs -f -l app=capi-controller-gke -n rafay-core -c capi-controller-gke --prefix --tail=10'
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+kpods() {
+  if [[ "$#" -eq 1 ]]; then
+    echo -e "${GREEN}kubectl get pods --all-namespaces -o wide -L version | grep $1 ${NC}"
+    kubectl get pods --all-namespaces -o wide -L version | grep "$1"
+  else
+    echo -e "${GREEN}kubectl get pods --all-namespaces -o wide -L version | grep -v NAME${NC}"
+    kubectl get pods --all-namespaces -o wide -L version | grep -v NAME
+  fi
+}
+
+_k_get_pod() {
+  local __selected_pod=$2
+  local pod_list
+  if [ -z "$1" ]; then
+    pod_list=($(kubectl get pods --all-namespaces | grep -v NAME | awk '{print $1 ":" $2}'))
+  else
+    pod_list=($(kubectl get pods --all-namespaces | grep "$1" | awk '{print $1 ":" $2}'))
+  fi
+  if [[ ${#pod_list[@]} -eq 0 ]]; then
+    echo -e "${RED}No pod to get${NC}"
+    return 1
+  elif [[ ${#pod_list[@]} -eq 1 ]]; then
+    eval "${__selected_pod}=${pod_list[0]}"
+    return 0
+  else
+    echo "Select pod (enter number)"
+    select selected_pod in "${pod_list[@]}"
+    do
+      if ! [[ -z ${selected_pod} ]]; then
+        eval "${__selected_pod}=${selected_pod}"
+        return 0
+      else
+        echo -e "${RED}Invalid Pod${NC}"
+        return 1
+      fi
+    done
+  fi
+}
+
+kbash() {
+  local __pod pod_namespace pod_name
+  _k_get_pod "$1" __pod
+  pod_namespace=$(echo "${__pod}" | cut -d ':' -f 1)
+  pod_name=$(echo "${__pod}" | cut -d ':' -f 2)
+  if [ ! -z "${pod_namespace}" ] && [ ! -z "${pod_name}" ]; then
+    echo -e "${GREEN}kubectl -n ${pod_namespace} exec -t -i ${pod_name} -- sh${NC}"
+    kubectl -n "${pod_namespace}" exec -t -i "${pod_name}" -- sh
+  fi
+}
+
+kdesc() {
+  local __pod pod_namespace pod_name
+  _k_get_pod "$1" __pod
+  pod_namespace=$(echo "${__pod}" | cut -d ':' -f 1)
+  pod_name=$(echo "${__pod}" | cut -d ':' -f 2)
+  if [ ! -z "${pod_namespace}" ] && [ ! -z "${pod_name}" ]; then
+    echo -e "${GREEN}kubectl -n ${pod_namespace} describe pod ${pod_name}${NC}"
+    kubectl -n "${pod_namespace}" describe pod "${pod_name}"
+  fi
+}
+
+kdel() {
+  local __pod pod_namespace pod_name
+  _k_get_pod "$1" __pod
+  pod_namespace=$(echo "${__pod}" | cut -d ':' -f 1)
+  pod_name=$(echo "${__pod}" | cut -d ':' -f 2)
+  if [ ! -z "${pod_namespace}" ] && [ ! -z "${pod_name}" ]; then
+    echo -e "${GREEN}kubectl -n ${pod_namespace} delete pod ${pod_name}${NC}"
+    kubectl -n "${pod_namespace}" delete pod "${pod_name}"
+  fi
+}
+
+klogs() {
+ local __pod __deployment pod_namespace pod_name
+ _k_get_pod "$1" __pod
+ _k_get_deployment "$1" __deployment
+ deployment_name=$(echo "${__deployment}" | cut -d ':' -f 2)
+ pod_namespace=$(echo "${__pod}" | cut -d ':' -f 1)
+ pod_name=$(echo "${__pod}" | cut -d ':' -f 2)
+ if [ ! -z "${pod_namespace}" ] && [ ! -z "${pod_name}" ]; then
+  echo -e "${GREEN}kubectl logs -n ${pod_namespace} ${pod_name} --container=${deployment_name} -f --tail=1${NC}"
+  kubectl logs -n "${pod_namespace}" "${pod_name}" --container=${deployment_name} -f --tail=1
+ fi
+}
+
+kimg() {
+  local __pod pod_namespace pod_name
+  _k_get_pod "$1" __pod
+  pod_namespace=$(echo "${__pod}" | cut -d ':' -f 1)
+  pod_name=$(echo "${__pod}" | cut -d ':' -f 2)
+  if [ ! -z "${pod_namespace}" ] && [ ! -z "${pod_name}" ]; then
+    echo -e "${GREEN}kubectl get pod -n ${pod_namespace} ${pod_name} -o yaml | grep image${NC}"
+    kubectl get pod -n "${pod_namespace}" "${pod_name}" -o yaml | grep image
+  fi
+}
+
+kdeps() {
+  if [[ "$#" -eq 1 ]]; then
+    echo -e "${GREEN}kubectl get deployment -A | grep $1 ${NC}"
+    kubectl get deployment -A | grep "$1"
+  else
+    echo -e "${GREEN}kubectl get deployment -A | grep -v NAME${NC}"
+    kubectl get deployment -A | grep -v NAME
+  fi
+}
+
+_k_get_deployment() {
+  local __selected_deployment=$2
+  local deployment_list
+  if [ -z "$1" ]; then
+    deployment_list=($(kubectl get deployment -A | grep -v NAME | awk '{print $1 ":" $2}'))
+  else
+    deployment_list=($(kubectl get deployment -A | grep "$1" | awk '{print $1 ":" $2}'))
+  fi
+  if [[ ${#deployment_list[@]} -eq 0 ]]; then
+    echo -e "${RED}No deployment to get${NC}"
+    return 1
+  elif [[ ${#deployment_list[@]} -eq 1 ]]; then
+    eval "${__selected_deployment}=${deployment_list[0]}"
+    return 0
+  else
+    echo "Select deployment (enter number)"
+    select selected_deployment in "${deployment_list[@]}"
+    do
+      if ! [[ -z ${selected_deployment} ]]; then
+        eval "${__selected_deployment}=${selected_deployment}"
+        return 0
+      else
+        echo -e "${RED}Invalid Deployment${NC}"
+        return 1
+      fi
+    done
+  fi
+}
+
+kedit() {
+  local __deployment deployment_namespace deployment_name
+  _k_get_deployment "$1" __deployment
+  deployment_namespace=$(echo "${__deployment}" | cut -d ':' -f 1)
+  deployment_name=$(echo "${__deployment}" | cut -d ':' -f 2)
+  if [ ! -z "${deployment_namespace}" ] && [ ! -z "${deployment_name}" ]; then
+    echo -e "${GREEN}kubectl edit deployment -n ${deployment_namespace} ${deployment_name}${NC}"
+    kubectl edit deployment -n "${deployment_namespace}" "${deployment_name}"
+  fi
+}
+
+kset() {
+  local __deployment deployment_namespace deployment_name
+  _k_get_deployment "$1" __deployment
+  deployment_namespace=$(echo "${__deployment}" | cut -d ':' -f 1)
+  deployment_name=$(echo "${__deployment}" | cut -d ':' -f 2)
+  if [ ! -z "${deployment_namespace}" ] && [ ! -z "${deployment_name}" ]; then
+    echo -e "${GREEN}kubectl -n ${deployment_namespace} set image deployment/${deployment_name} ${deployment_name}=$2${NC}"
+    kubectl -n ${deployment_namespace} set image deployment/${deployment_name} ${deployment_name}=$2
+  fi
+}
+
+kscale() {
+  local __deployment deployment_namespace deployment_name
+  _k_get_deployment "$1" __deployment
+  deployment_namespace=$(echo "${__deployment}" | cut -d ':' -f 1)
+  deployment_name=$(echo "${__deployment}" | cut -d ':' -f 2)
+  if [ ! -z "${deployment_namespace}" ] && [ ! -z "${deployment_name}" ]; then
+    echo -e "${GREEN}kubectl scale deploy -n ${deployment_namespace} ${deployment_name} --replicas=$2"
+    kubectl scale deploy -n ${deployment_namespace} ${deployment_name} --replicas=$2
+  fi
+}
+
+kns() {
+  if [[ "$#" -eq 1 ]]; then
+    echo -e "${GREEN}kubectl get ns -A | grep $1 ${NC}"
+    kubectl get ns -A | grep "$1"
+  else
+    echo -e "${GREEN}kubectl get ns -A | grep -v NAME${NC}"
+    kubectl get ns -A | grep -v NAME
+  fi
+}
