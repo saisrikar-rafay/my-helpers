@@ -6,6 +6,7 @@ alias conn2-db='kubectl exec -it -n rafay-core $(kubectl get pod --selector="app
 alias admin-logs='kubectl logs -f -l app=admin-api -n rafay-core -c admin-api --prefix --tail=10'
 alias cluster-scheduler-logs='kubectl logs -f -l app=cluster-scheduler -n rafay-core -c cluster-scheduler --prefix --tail=10'
 alias rafay-config-logs='kubectl logs -f -l app=rafay-config -n rafay-core -c rafay-config --prefix --tail=10'
+alias event-framework-logs='kubectl logs -f -l app=event-framework -n rafay-core -c event-framework --prefix --tail=10'
 alias rafay-relay-logs='kubectl logs -f -l app=rafay-relay -n rafay-core -c rafay-relay --prefix --tail=10'
 alias rafay-cd-relay-logs='kubectl logs -f -l app=rafay-cd-relay -n rafay-core -c rafay-cd-relay --prefix --tail=10'
 alias rafay-pipeline-logs='kubectl logs -f -l app=rafay-pipeline -n rafay-core -c rafay-pipeline --prefix --tail=10'
